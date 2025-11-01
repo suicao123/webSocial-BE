@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -12,4 +6,118 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model comments {
+  comment_id BigInt    @id @default(autoincrement())
+  post_id    BigInt
+  user_id    BigInt
+  content    String
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  posts      posts     @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: NoAction)
+  users      users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model conversations {
+  conversation_id BigInt         @id @default(autoincrement())
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  messages        messages[]
+  participants    participants[]
+}
+
+model friendships {
+  user_one_id                             BigInt
+  user_two_id                             BigInt
+  status                                  friendship_status @default(pending)
+  action_user_id                          BigInt
+  created_at                              DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at                              DateTime?         @default(now()) @db.Timestamptz(6)
+  users_friendships_action_user_idTousers users             @relation("friendships_action_user_idTousers", fields: [action_user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  users_friendships_user_one_idTousers    users             @relation("friendships_user_one_idTousers", fields: [user_one_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  users_friendships_user_two_idTousers    users             @relation("friendships_user_two_idTousers", fields: [user_two_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_one_id, user_two_id])
+}
+
+model messages {
+  message_id      BigInt        @id @default(autoincrement())
+  conversation_id BigInt
+  sender_id       BigInt?
+  content         String
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  conversations   conversations @relation(fields: [conversation_id], references: [conversation_id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?        @relation(fields: [sender_id], references: [user_id], onUpdate: NoAction)
+}
+
+model participants {
+  user_id         BigInt
+  conversation_id BigInt
+  joined_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  conversations   conversations @relation(fields: [conversation_id], references: [conversation_id], onDelete: Cascade, onUpdate: NoAction)
+  users           users         @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, conversation_id])
+}
+
+model post_likes {
+  user_id    BigInt
+  post_id    BigInt
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  posts      posts     @relation(fields: [post_id], references: [post_id], onDelete: Cascade, onUpdate: NoAction)
+  users      users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, post_id])
+}
+
+model posts {
+  post_id                     BigInt       @id @default(autoincrement())
+  user_id                     BigInt
+  admin_id                    BigInt?
+  content                     String?
+  image_url                   String[]
+  created_at                  DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime?    @default(now()) @db.Timestamptz(6)
+  comments                    comments[]
+  post_likes                  post_likes[]
+  users_posts_admin_idTousers users?       @relation("posts_admin_idTousers", fields: [admin_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  users_posts_user_idTousers  users        @relation("posts_user_idTousers", fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model roles {
+  role_id   Int     @id
+  role_name String  @unique @db.VarChar(50)
+  users     users[]
+}
+
+model users {
+  user_id                                       BigInt         @id @default(autoincrement())
+  role_id                                       Int?
+  username                                      String         @unique @db.VarChar(50)
+  email                                         String?        @unique @db.VarChar(255)
+  password_hash                                 String         @db.VarChar(255)
+  display_name                                  String?        @db.VarChar(100)
+  avatar_url                                    String?        @default("https://res.cloudinary.com/dd0yqxowo/image/upload/v1761823049/user-default_jxnvbw.jpg")
+  bio                                           String?
+  created_at                                    DateTime?      @default(now()) @db.Timestamptz(6)
+  comments                                      comments[]
+  friendships_friendships_action_user_idTousers friendships[]  @relation("friendships_action_user_idTousers")
+  friendships_friendships_user_one_idTousers    friendships[]  @relation("friendships_user_one_idTousers")
+  friendships_friendships_user_two_idTousers    friendships[]  @relation("friendships_user_two_idTousers")
+  messages                                      messages[]
+  participants                                  participants[]
+  post_likes                                    post_likes[]
+  posts_posts_admin_idTousers                   posts[]        @relation("posts_admin_idTousers")
+  posts_posts_user_idTousers                    posts[]        @relation("posts_user_idTousers")
+  roles                                         roles?         @relation(fields: [role_id], references: [role_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+enum friendship_status {
+  pending
+  accepted
+  blocked
+}
+
+enum participant_role {
+  member
+  admin
 }

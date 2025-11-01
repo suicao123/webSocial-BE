@@ -1,9 +1,10 @@
-const loginRoute = require('./login.route');
+const express = require('express');
+const router = express.Router();
+const authRoute = require('./auth.route');
+const postsRoute = require('./posts.route');
 
-function route(app) {
 
-    app.use('/api/v1', loginRoute);
+router.use('/login', authRoute);
+router.use('/posts', postsRoute);
 
-}
-
-module.exports = route;
+module.exports = router;
