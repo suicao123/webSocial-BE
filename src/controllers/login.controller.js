@@ -1,16 +1,21 @@
 const jwt = require('jsonwebtoken');
+const { authUser } = require('../services/auth.service');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-function authLogin(req, res) {
+async function authLogin(req, res) {
     
     const {username, password} = req.body;
 
-    if(username === "admin" && password === "123456") {
+    const user = await authUser(username, password);
+
+    if(user) {
 
         const payload = {
-            userId: username,
-            username: username
+            user_id: user.user_id,
+            username: user.username,
+            display_name: user.display_name,
+            email: user.email
         };
 
         const token = jwt.sign(

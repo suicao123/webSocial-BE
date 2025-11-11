@@ -12,9 +12,13 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^6.18.0",
+    "bcrypt": "^6.0.0",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0"
   },
   "devDependencies": {
     "jsonwebtoken": "^9.0.2",

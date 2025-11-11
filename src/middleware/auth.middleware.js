@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
-
+require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-export function authMidleware(req, res, next) {
+function authMidleware(req, res, next) {
 
     try {
         const authHeader = req.headers['authorization'];
@@ -13,7 +13,7 @@ export function authMidleware(req, res, next) {
             return res.status(401).json({ message: "Khong co token" });
         }
 
-        jwt.verify(token, jwt, (err, userPayload) => {
+        jwt.verify(token, JWT_SECRET, (err, userPayload) => {
             if(err) {
                 return res.status(401).json({ message: "sai token" });
             }
@@ -31,3 +31,5 @@ export function authMidleware(req, res, next) {
     }
 
 }
+
+module.exports = authMidleware;

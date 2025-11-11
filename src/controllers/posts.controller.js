@@ -24,7 +24,11 @@ async function getPost(req, res) {
                         comments: true,   // Sẽ trả về: "comments": (số lượng)
                         post_likes: true  // Sẽ trả về: "post_likes": (số lượng)
                     }
-                }
+                },
+            },
+                
+            orderBy: {
+                created_at: 'desc' // Sắp xếp theo cột 'created_at' theo thứ tự giảm dần
             }
         });
         res.status(200).json(post);
@@ -38,21 +42,21 @@ async function getPost(req, res) {
 async function createPost(req, res) {
     try {
 
-        const {userId, content, imageUrl} = req.body;
+        const {user_id, content, image_url} = req.body;
 
-        if(!userId) {
+        if(!user_id) {
             res.status(400).json({Message:'Không thấy tác giả!!!!'});
         }
 
         const newPost = await prisma.posts.create({
             data: {
                 content: content,
-                image_url: imageUrl,
+                image_url: image_url,
                 users_posts_user_idTousers: {
                     connect: {
                         // Kết nối bằng ID (primary key) của bảng 'users'
                         // Giả sử primary key của bảng users là 'user_id'
-                        user_id: BigInt(userId) 
+                        user_id: BigInt(user_id) 
                     }
                 }
             }
@@ -72,7 +76,51 @@ async function createPost(req, res) {
         }
 }
 
+async function deletePost(req, res) {
+    try {
+
+        const postId = BigInt(req.params.id);
+
+        const postDeleted = await prisma.posts.delete({
+            where: {
+                post_id: postId
+            }
+        });
+
+        res.status(201).json({message: "Xóa thành công!!!", postDeleted: postDeleted});
+
+
+    } catch (error) {
+        console.error("Lỗi khi create:", error);
+        return res.status(404).json({ error: 'Post ID không tồn tại.' });
+    }
+}
+
+async function uploadImage(req, res) {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ message: 'Không có tệp nào được tải lên.' });
+        }
+
+        const uploadResults = req.files.map(file => ({
+            url: file.path,
+            public_id: file.filename
+        }));
+
+        res.status(200).json({
+            message: 'Tải ảnh lên thành công',
+            data: uploadResults,
+        });
+    }
+    catch (error) {
+        console.error("Lỗi khi create:", error);
+        return res.status(404).json({ error: 'upload Thất bại!.' });
+    }
+}
+
 module.exports = {
     getPost,
-    createPost
+    createPost,
+    deletePost,
+    uploadImage
 }
