@@ -2,8 +2,9 @@ const { PrismaClient } = require('../generated/prisma');
 const prisma = new PrismaClient();
 
 async function getPost(req, res) {
+    const currentid = req.user?.user_id;
     try {
-        const post = await prisma.posts.findMany({
+        const posts = await prisma.posts.findMany({
             include: {
                 // "users" là tên quan hệ mà Prisma tự tạo ra
                 // trỏ từ model "posts" sang model "users"
@@ -25,13 +26,31 @@ async function getPost(req, res) {
                         post_likes: true  // Sẽ trả về: "post_likes": (số lượng)
                     }
                 },
+
+                post_likes: {
+                    where: {
+                        user_id: currentid
+                    },
+                    select: {
+                        user_id: true
+                    }
+                }
             },
                 
             orderBy: {
                 created_at: 'desc' // Sắp xếp theo cột 'created_at' theo thứ tự giảm dần
             }
         });
-        res.status(200).json(post);
+
+        const data = posts.map(post => {
+            const {post_likes, ...restPost} = post;
+            return {
+                ...restPost,
+                isLike: post_likes.length > 0
+            }
+        });
+
+        res.status(200).json(data);
     }
     catch (error) {
         console.error("Lỗi khi getPost:", error);
@@ -118,9 +137,120 @@ async function uploadImage(req, res) {
     }
 }
 
+async function getComment(req, res) {
+    const data = req.query;
+
+    try {
+        const comments = await prisma.comments.findMany({
+            where: {
+                post_id: data.post_id
+            },
+            orderBy: {
+                created_at: 'desc'
+            },
+            select: {
+                post_id: true,
+                content: true,
+
+                users: {
+                    select: {
+                        display_name: true,
+                        avatar_url: true
+                    }
+                }
+            }
+        });
+
+        return res.status(200).json(comments);
+    }
+    catch (error) {
+        console.error("Lỗi khi lấy comment:", error);
+        return res.status(404).json({ error: 'Lấy comment Thất bại!.' });
+    }
+}
+
+async function createComment(req, res) {
+    try {
+        const data = req.body;
+
+        const dataComment = await prisma.comments.create({
+            data: {
+                content: data.content,
+
+                posts: {
+                    connect: {
+                        post_id: BigInt(data.post_id)
+                    }
+                },
+
+                users: {
+                    connect: {
+                        user_id: BigInt(data.user_id)
+                    }
+                }
+            }
+        });
+
+        res.status(200).json(dataComment);
+
+    } catch (error) {
+        console.error("Lỗi khi lấy comment:", error);
+        return res.status(404).json({ error: 'Tạo comment Thất bại!.' });
+    }
+}
+
+async function createLike(req, res) {
+    try {
+
+        const userIdString = req.user?.user_id;
+        const { id } = req.params;
+        
+        const user_id = BigInt(userIdString);
+        const post_id = BigInt(id);
+        
+
+        const checkLike = await prisma.post_likes.findUnique({
+            where: {
+                user_id_post_id: {
+                    user_id: user_id,
+                    post_id: post_id
+                }
+            }
+        });
+
+        if(checkLike) {
+            await prisma.post_likes.delete({
+                where: {
+                    user_id_post_id: {
+                        user_id: user_id,
+                        post_id: post_id
+                    }
+                }
+            });
+            res.status(200).json('Bỏ thích');
+        }
+        else {
+            await prisma.post_likes.create({
+                data: {
+                    user_id: user_id,
+                    post_id: post_id
+                }
+            });
+            res.status(201).json('Đã thích');
+        }
+
+    } catch (error) {
+        console.error("Lỗi khi lấy comment:", error);
+        return res.status(404).json({ error: 'Like Thất bại!.' });
+    }
+}
+
 module.exports = {
     getPost,
     createPost,
     deletePost,
-    uploadImage
+    uploadImage,
+    getComment,
+    createComment,
+    createLike
 }
