@@ -1,18 +1,51 @@
-BigInt.prototype.toJSON = function() {
-  return this.toString();
+BigInt.prototype.toJSON = function () {
+    return this.toString();
 };
 
-const express = require('express')
-const cors = require('cors')
-const app = express()
-const port = 8080
-app.use(express.json());
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const app = express();
+const port = 8080;
 require('dotenv').config();
 
 //import routes
 const routes = require('./src/routes');
+const { Server } = require('socket.io');
+const socketMiddleware = require('./src/middleware/socket.middleware');
 
-app.use(cors())
+app.use(cors());
+app.use(express.json());
+
+// 3. Tạo HTTP Server từ Express app
+const server = http.createServer(app);
+
+const io = new Server(server, {
+    cors: {
+        origin: "http://localhost:5173", // Thay bằng URL Frontend chính xác của bạn
+        methods: ["GET", "POST"]
+    }
+});
+
+// Lắng nghe các sự kiện kết nối Socket
+io.on("connection", (socket) => {
+    // Logic xử lý khi Client kết nối và tham gia phòng (room)
+    socket.on("join_post", (postId) => {
+        if (postId) {
+            // Cho phép socket tham gia phòng có tên là postId
+            socket.join(postId);
+            console.log(`Socket ${socket.id} joined room post_${postId}`);
+        }
+    });
+
+    socket.on("disconnect", () => {
+        console.log("User Disconnected", socket.id);
+    });
+});
+
+// SỬ DỤNG MIDDLEWARE ĐỂ GẮN 'io' VÀO MỌI REQUEST
+// Ta gọi hàm socketMiddleware(io) và truyền instance io vào
+app.use(socketMiddleware(io));
 
 app.use('/api/v1', routes);
 
@@ -37,6 +70,11 @@ app.get('/', (req, res) => {
 //     });
 // });
 
-app.listen(port, () => {
-    console.log(`Example app listening on port ${port}`)
-})
+// app.listen(port, () => {
+//     console.log(`Example app listening on port ${port}`)
+// })
+
+server.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+    console.log(`Socket.io is ready for connections`);
+});

@@ -12,5 +12,6 @@ router.post('/createComment', authMidleware, postController.createComment);
 
 router.post('/createLike/:id', authMidleware, postController.createLike);
 router.delete('/delete/:id', authMidleware, postController.deletePost);
+router.get('/postsProfile/:id', authMidleware, postController.getPostProfile);
 
 module.exports = router;

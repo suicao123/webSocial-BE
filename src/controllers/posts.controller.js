@@ -58,6 +58,71 @@ async function getPost(req, res) {
     }
 }
 
+async function getPostProfile(req, res) {
+    try {
+
+        const userId = BigInt(req.params.id);
+
+        const data = await prisma.posts.findMany({
+
+            where: {
+                user_id: userId
+            },
+
+            include: {
+                // "users" là tên quan hệ mà Prisma tự tạo ra
+                // trỏ từ model "posts" sang model "users"
+                users_posts_user_idTousers: {
+                    select: { // Chỉ lấy thông tin an toàn
+                        user_id: true,
+                        display_name: true,
+                        avatar_url: true,
+                        username: true
+                    }
+                },
+                // Tên quan hệ đúng cho "admin duyệt" (nếu bạn cần)
+                // users_posts_admin_idTousers: true, 
+                    
+                // Lấy cả comments và likes
+                _count: {
+                    select: {
+                        comments: true,   // Sẽ trả về: "comments": (số lượng)
+                        post_likes: true  // Sẽ trả về: "post_likes": (số lượng)
+                    }
+                },
+
+                post_likes: {
+                    where: {
+                        user_id: userId 
+                    },
+                    select: {
+                        user_id: true
+                    }
+                }
+            },
+            
+            orderBy: {
+                created_at: 'desc'
+            },
+        });
+
+        const dataRes = data.map(post => {
+            const {post_likes, ...restPost} = post;
+            return {
+                ...restPost,
+                isLike: post_likes.length > 0
+            }
+        });
+
+        res.status(200).json(dataRes);
+
+
+    } catch (error) {
+        console.error("Lỗi khi create:", error);
+        return res.status(404).json({ error: 'Lấy bài đăng thất bại.' });
+    }
+}
+
 async function createPost(req, res) {
     try {
 
@@ -188,8 +253,24 @@ async function createComment(req, res) {
                         user_id: BigInt(data.user_id)
                     }
                 }
+            },
+            select: {
+                post_id: true,
+                content: true,
+                users: {
+                    select: {
+                        display_name: true, 
+                        avatar_url: true    
+                    }
+                }
             }
         });
+
+        if (req.io) {
+            const roomId = data.post_id.toString();
+            
+            req.io.to(roomId).emit("new_comment_created", dataComment);
+        }
 
         res.status(200).json(dataComment);
 
@@ -252,5 +333,6 @@ module.exports = {
     uploadImage,
     getComment,
     createComment,
-    createLike
+    createLike,
+    getPostProfile
 }

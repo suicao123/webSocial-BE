@@ -10,6 +10,7 @@ async function authLogin(req, res) {
     const {username, password} = req.body;
 
     const user = await authUser(username, password);
+    
 
     if(user) {
 
@@ -17,7 +18,8 @@ async function authLogin(req, res) {
             user_id: user.user_id,
             username: user.username,
             display_name: user.display_name,
-            email: user.email
+            email: user.email,
+            role: user.role_id
         };
 
         const token = jwt.sign(
