@@ -61,12 +61,12 @@ async function getPost(req, res) {
 async function getPostProfile(req, res) {
     try {
 
-        const userId = BigInt(req.params.id);
+        const {myId, user_id} = req.body;
 
         const data = await prisma.posts.findMany({
 
             where: {
-                user_id: userId
+                user_id: user_id
             },
 
             include: {
@@ -93,7 +93,7 @@ async function getPostProfile(req, res) {
 
                 post_likes: {
                     where: {
-                        user_id: userId 
+                        user_id: myId 
                     },
                     select: {
                         user_id: true

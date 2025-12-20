@@ -38,6 +38,14 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Login chat
+    socket.on("join_room", (conversationId) => {
+        if (conversationId) {
+            socket.join(conversationId.toString()); 
+            console.log(`Socket ${socket.id} đã vào phòng chat: ${conversationId}`);
+        }
+    });
+
     socket.on("disconnect", () => {
         console.log("User Disconnected", socket.id);
     });
