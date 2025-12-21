@@ -203,6 +203,7 @@ async function getNonFriends(req, res) {
 
 async function sendFriendRequest(req, res) {
     try {
+
         const senderId = BigInt(req.user.user_id);
         const targetUserId = BigInt(req.body.target_user_id); 
 
@@ -302,6 +303,33 @@ async function cancelFriendRequest(req, res) {
     }
 }
 
+async function uploadAvatarProfile(req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'Không có tệp nào được tải lên.' });
+        }
+
+        // const uploadResults = req.files.map(file => ({
+        //     url: file.path,
+        //     public_id: file.filename
+        // }));
+
+        const uploadResults = {
+            url: req.file.path,
+            public_id: req.file.filename
+        };
+
+        res.status(200).json({
+            message: 'Tải ảnh lên thành công',
+            data: uploadResults,
+        });
+    }
+    catch (error) {
+        console.error("Lỗi khi create:", error);
+        return res.status(404).json({ error: 'upload Thất bại!.' });
+    }
+}
+
 async function acceptFriendRequest(req, res) {
     try {
         const currentUserId = BigInt(req.user.user_id);
@@ -363,6 +391,122 @@ async function acceptFriendRequest(req, res) {
     }
 }
 
+async function getFriendshipStatus(req, res) {
+    try {
+        const currentUserId = BigInt(req.user.user_id);
+        const targetUserId = BigInt(req.params.user_id);
+
+        const userOneId = currentUserId < targetUserId ? currentUserId : targetUserId;
+        const userTwoId = currentUserId > targetUserId ? currentUserId : targetUserId;
+
+        if(currentUserId == targetUserId) {
+            return res.status(200).json('SELF');
+        }
+
+        const friendship = await prisma.friendships.findUnique({
+            where: {
+                user_one_id_user_two_id: {
+                    user_one_id: userOneId,
+                    user_two_id: userTwoId
+                }
+            }
+        });
+
+        let status = 'NOT_FRIEND';
+
+        if(friendship) {
+            if(friendship.status == "accepted") {
+                status = "accepted";
+            }
+            else if (friendship.status === 'pending') {
+                if (friendship.action_user_id === currentUserId) {
+                    status = 'REQUEST_SENT';
+                } else {
+                    status = 'REQUEST_RECEIVED';
+                }
+            }
+        }
+
+        return res.status(200).json(status);
+
+    } catch (error) {
+        console.error("Lỗi lấy trạng thái bạn bè:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Lỗi server khi kiểm tra trạng thái bạn bè" 
+        });
+    }
+}
+
+async function unfriend(req, res) {
+    try {
+        const currentUserId = BigInt(req.user.user_id);
+        const targetUserId = BigInt(req.params.user_id);
+
+        const userOneId = currentUserId < targetUserId ? currentUserId : targetUserId;
+        const userTwoId = currentUserId > targetUserId ? currentUserId : targetUserId;
+
+        await prisma.friendships.delete({
+            where: {
+                user_one_id_user_two_id: {
+                    user_one_id: userOneId,
+                    user_two_id:userTwoId
+                }
+            }
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Đã hủy kết bạn thành công",
+        });
+    } catch (error) {
+        console.error("Lỗi hủy kết bạn:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Lỗi server khi hủy kết bạn" 
+        });
+    }
+}
+
+async function updateProfile(req, res) {
+    try {
+        const currentUserId = BigInt(req.user.user_id);
+
+        const {display_name, email, bio, avatar_url} = req.body;
+
+        const updateRes = await prisma.users.update({
+            where: {
+                user_id: currentUserId
+            },
+            data: {
+                display_name: display_name,
+                email: email,
+                bio: bio,
+                avatar_url: avatar_url
+            },
+            select: {
+                user_id: true,
+                display_name: true,
+                email: true,
+                avatar_url: true
+            }   
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Cập nhật thông tin thành công!",
+            data: updateRes
+        });
+
+    } catch (error) {
+        console.error("Lỗi sửa trang chủ:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Lỗi server khi sửa trang chủ" 
+        });
+    }
+}
+
 module.exports = {
     getUser,
     getFriends,
@@ -370,5 +514,9 @@ module.exports = {
     getNonFriends,
     sendFriendRequest,
     cancelFriendRequest,
-    acceptFriendRequest
+    acceptFriendRequest,
+    getFriendshipStatus,
+    unfriend,
+    uploadAvatarProfile,
+    updateProfile
 }

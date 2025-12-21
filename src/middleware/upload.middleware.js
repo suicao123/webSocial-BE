@@ -22,6 +22,18 @@ const storage = new CloudinaryStorage({
     },
 });
 
-const upload = multer({ storage: storage });
+const storageAvatar = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'socialWebsite/users/avatar',
+        allowed_formats: ['jpg', 'png', 'jpeg'],
+    },
+});
 
-module.exports = upload;
+const upload = multer({ storage: storage });
+const uploadAvatar = multer({ storage: storageAvatar });
+
+module.exports = {
+    upload,
+    uploadAvatar
+};
