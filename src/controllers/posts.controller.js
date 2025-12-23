@@ -16,8 +16,6 @@ async function getPost(req, res) {
                         username: true
                     }
                 },
-                // Tên quan hệ đúng cho "admin duyệt" (nếu bạn cần)
-                // users_posts_admin_idTousers: true, 
                     
                 // Lấy cả comments và likes
                 _count: {
@@ -280,6 +278,39 @@ async function createComment(req, res) {
     }
 }
 
+async function updatePost(req, res) {
+    try {
+        const { id } = req.params;
+        const { content, image_url } = req.body;
+        const userId = req.user.user_id;
+
+        const existingPost = await prisma.posts.findUnique({
+            where: { post_id: BigInt(id) }
+        });
+
+        if (!existingPost) {
+            return res.status(404).json({ message: "Bài viết không tồn tại" });
+        }
+
+        const updatedPost = await prisma.posts.update({
+            where: { post_id: BigInt(id) },
+            data: {
+                content: content,
+                image_url: image_url,
+                updated_at: new Date(),
+                
+                admin_id: BigInt(userId) 
+            }
+        });
+
+        return res.status(200).json(updatePost);
+
+    } catch (error) {
+        console.error("Lỗi update post:", error);
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+}
+
 async function createLike(req, res) {
     try {
 
@@ -334,5 +365,6 @@ module.exports = {
     getComment,
     createComment,
     createLike,
-    getPostProfile
+    getPostProfile,
+    updatePost
 }
