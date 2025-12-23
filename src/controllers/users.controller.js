@@ -26,6 +26,58 @@ async function getUser(req, res) {
     }
 }
 
+async function getUsersList(req, res) {
+    try {
+        const users = await prisma.users.findMany({
+            where: {
+                role_id: 1
+            },
+            select: {
+                user_id: true,
+                display_name: true,
+                email: true,
+                avatar_url: true,
+                created_at: true,
+                _count: {
+                    select: {
+                        posts_posts_user_idTousers: true, 
+
+                        friendships_friendships_user_one_idTousers: {
+                            where: { status: 'accepted' }
+                        },
+                        friendships_friendships_user_two_idTousers: {
+                            where: { status: 'accepted' }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                created_at: 'desc'
+            }
+        });
+
+        const formattedUsers = users.map(user => {
+            const totalFriends = 
+                user._count.friendships_friendships_user_one_idTousers + 
+                user._count.friendships_friendships_user_two_idTousers;
+
+            return {
+                user_id: user.user_id,
+                display_name: user.display_name,
+                email: user.email,
+                avatar_url: user.avatar_url,
+                created_at: user.created_at,
+                post_count: user._count.posts_posts_user_idTousers,
+                friend_count: totalFriends
+            };
+        });
+
+        return res.status(200).json(formattedUsers);
+    } catch (error) {
+        
+    }
+}
+
 async function getFriends(req, res) {
     try {
         
@@ -468,9 +520,44 @@ async function unfriend(req, res) {
     }
 }
 
+async function deleteUser(req, res) {
+    try {
+        const user_id = req.params.id;
+
+        const existsUser = await prisma.users.findUnique({
+            where: {
+                user_id: user_id
+            }
+        });
+
+        if (!existsUser) {
+            return res.status(404).json({ message: "Người dùng không tồn tại." });
+        }
+
+        await prisma.users.delete({
+            where: {
+                user_id: BigInt(user_id)
+            }
+        });
+
+        return res.status(200).json({
+            message: "Xóa người dùng thành công."
+        });
+    } catch (error) {
+        console.error("Lỗi xóa user:", error);
+        
+        // Bắt lỗi P2025 (Record to delete does not exist) của Prisma
+        if (error.code === 'P2025') {
+            return res.status(404).json({ message: "Người dùng không tồn tại." });
+        }
+
+        return res.status(500).json({ message: "Lỗi server", error: error.message });
+    }
+}
+
 async function updateProfile(req, res) {
     try {
-        const currentUserId = BigInt(req.user.user_id);
+        const currentUserId = req.body.user_id;
 
         const {display_name, email, bio, avatar_url} = req.body;
 
@@ -518,5 +605,7 @@ module.exports = {
     getFriendshipStatus,
     unfriend,
     uploadAvatarProfile,
-    updateProfile
+    updateProfile,
+    getUsersList,
+    deleteUser
 }
