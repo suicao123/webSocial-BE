@@ -1,4 +1,5 @@
 const { PrismaClient } = require('../generated/prisma');
+const { calculateGrowth } = require('../services/auth.service');
 const prisma = new PrismaClient();
 
 async function getUser(req, res) {
@@ -7,7 +8,7 @@ async function getUser(req, res) {
 
         const user = await prisma.users.findUnique({
             where: {
-                user_id: userId
+                user_id: BigInt(userId)
             },
             select: {
                 user_id: true,  
@@ -26,12 +27,161 @@ async function getUser(req, res) {
     }
 }
 
+// async function getUsersList(req, res) {
+//     try {
+//         const users = await prisma.users.findMany({
+//             where: {
+//                 role_id: 1
+//             },
+//             select: {
+//                 user_id: true,
+//                 display_name: true,
+//                 email: true,
+//                 avatar_url: true,
+//                 created_at: true,
+//                 _count: {
+//                     select: {
+//                         posts_posts_user_idTousers: true, 
+
+//                         friendships_friendships_user_one_idTousers: {
+//                             where: { status: 'accepted' }
+//                         },
+//                         friendships_friendships_user_two_idTousers: {
+//                             where: { status: 'accepted' }
+//                         }
+//                     }
+//                 }
+//             },
+//             orderBy: {
+//                 created_at: 'desc'
+//             }
+//         });
+
+//         const formattedUsers = users.map(user => {
+//             const totalFriends = 
+//                 user._count.friendships_friendships_user_one_idTousers + 
+//                 user._count.friendships_friendships_user_two_idTousers;
+
+//             return {
+//                 user_id: user.user_id,
+//                 display_name: user.display_name,
+//                 email: user.email,
+//                 avatar_url: user.avatar_url,
+//                 created_at: user.created_at,
+//                 post_count: user._count.posts_posts_user_idTousers,
+//                 friend_count: totalFriends
+//             };
+//         });
+
+//         return res.status(200).json(formattedUsers);
+//     } catch (error) {
+        
+//     }
+// }
+
 async function getUsersList(req, res) {
     try {
+        const { search } = req.query;
+
+        const whereCondition = {
+            role_id: 1
+        };
+
+        if (search) {
+            whereCondition.OR = [
+                { 
+                    display_name: { 
+                        contains: search, 
+                        mode: 'insensitive' // Tìm kiếm không phân biệt hoa thường
+                    } 
+                },
+                { 
+                    email: { 
+                        contains: search, 
+                        mode: 'insensitive' 
+                    } 
+                }
+            ];
+        }
+
         const users = await prisma.users.findMany({
-            where: {
-                role_id: 1
+            where: whereCondition,
+            select: {
+                user_id: true,
+                display_name: true,
+                email: true,
+                avatar_url: true,
+                created_at: true,
+                _count: {
+                    select: {
+                        posts_posts_user_idTousers: true, 
+                        friendships_friendships_user_one_idTousers: {
+                            where: { status: 'accepted' }
+                        },
+                        friendships_friendships_user_two_idTousers: {
+                            where: { status: 'accepted' }
+                        }
+                    }
+                }
             },
+            orderBy: {
+                created_at: 'desc'
+            }
+        });
+
+        // 5. Format dữ liệu trả về (giữ nguyên logic cũ)
+        const formattedUsers = users.map(user => {
+            const totalFriends = 
+                user._count.friendships_friendships_user_one_idTousers + 
+                user._count.friendships_friendships_user_two_idTousers;
+
+            return {
+                // Lưu ý: user_id là BigInt, nên convert sang string để tránh lỗi JSON
+                user_id: user.user_id.toString(), 
+                display_name: user.display_name,
+                email: user.email,
+                avatar_url: user.avatar_url,
+                created_at: user.created_at,
+                post_count: user._count.posts_posts_user_idTousers,
+                friend_count: totalFriends
+            };
+        });
+
+        return res.status(200).json(formattedUsers);
+
+    } catch (error) {
+        console.error("Lỗi lấy danh sách user:", error);
+        return res.status(500).json({ message: "Lỗi Server" });
+    }
+}
+
+async function getAdminsList(req, res) {
+    try {
+        const { search } = req.query;
+
+        const whereCondition = {
+            role_id: 0
+        };
+
+        if (search) {
+            whereCondition.OR = [
+                { 
+                    display_name: { 
+                        contains: search, 
+                        mode: 'insensitive' // Tìm kiếm không phân biệt hoa thường
+                    } 
+                },
+                { 
+                    email: { 
+                        contains: search, 
+                        mode: 'insensitive' 
+                    } 
+                }
+            ];
+        }
+
+        const users = await prisma.users.findMany({
+            where: whereCondition,
             select: {
                 user_id: true,
                 display_name: true,
@@ -250,6 +400,39 @@ async function getNonFriends(req, res) {
     } catch (error) {
         console.error("Lỗi khi lấy danh sách nonFiends:", error);
         return res.status(404).json({ error: 'Lấy danh sách nonFiends Thất bại!.' });
+    }
+}
+
+async function getDashboardStats(req, res) {
+    try {
+        // --- 1. Thống kê Bài viết (Posts) ---
+        const postsStats = await calculateGrowth(prisma.posts);
+
+        // --- 2. Thống kê Người dùng (Users - Role = 1) ---
+        const usersStats = await calculateGrowth(prisma.users, { role_id: 1 });
+
+        // --- 3. Thống kê Admin (Role = 0) - Chỉ cần tổng số ---
+        const totalAdmins = await prisma.users.count({
+            where: { role_id: 0 }
+        });
+
+        return res.status(200).json({
+            posts: {
+                total: postsStats.total,
+                increase: postsStats.growth_percentage
+            },
+            users: {
+                total: usersStats.total,
+                increase: usersStats.growth_percentage
+            },
+            admins: {
+                total: totalAdmins
+            }
+        });
+
+    } catch (error) {
+        console.error("Lỗi lấy thống kê:", error);
+        return res.status(500).json({ message: "Lỗi Server" });
     }
 }
 
@@ -607,5 +790,8 @@ module.exports = {
     uploadAvatarProfile,
     updateProfile,
     getUsersList,
-    deleteUser
+    deleteUser,
+    getAdminsList,
+    // getUsersListByName
+    getDashboardStats
 }

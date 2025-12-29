@@ -4,7 +4,28 @@ const prisma = new PrismaClient();
 async function getPost(req, res) {
     const currentid = req.user?.user_id;
     try {
+
+        const search = req.query.search??'';
+
+        const whereCondition = {
+            
+        };
+
+        if (search) {
+            whereCondition.OR = [
+                { 
+                    users_posts_user_idTousers: {
+                        display_name: { 
+                            contains: search, 
+                            mode: 'insensitive' // Tìm kiếm không phân biệt hoa thường
+                        } 
+                    }
+                }
+            ];
+        }
+
         const posts = await prisma.posts.findMany({
+            where: whereCondition,
             include: {
                 // "users" là tên quan hệ mà Prisma tự tạo ra
                 // trỏ từ model "posts" sang model "users"
