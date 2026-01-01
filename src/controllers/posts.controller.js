@@ -233,8 +233,12 @@ async function getComment(req, res) {
                 created_at: 'desc'
             },
             select: {
+                comment_id: true, 
+                user_id: true,
+                
                 post_id: true,
                 content: true,
+                created_at: true,
 
                 users: {
                     select: {
@@ -274,12 +278,15 @@ async function createComment(req, res) {
                 }
             },
             select: {
+                comment_id: true, 
+                user_id: true, 
                 post_id: true,
                 content: true,
+                created_at: true,
                 users: {
                     select: {
-                        display_name: true, 
-                        avatar_url: true    
+                        display_name: true,
+                        avatar_url: true
                     }
                 }
             }
@@ -296,6 +303,44 @@ async function createComment(req, res) {
     } catch (error) {
         console.error("Lỗi khi lấy comment:", error);
         return res.status(404).json({ error: 'Tạo comment Thất bại!.' });
+    }
+}
+
+async function deleteComment(req, res) {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({ error: 'Thiếu comment_id' });
+        }
+
+        const deletedComment = await prisma.comments.delete({
+            where: {
+                comment_id: BigInt(id)
+            },
+            select: {
+                comment_id: true,
+                post_id: true 
+            }
+        });
+
+        // Xử lý Real-time (Socket.IO)
+        if (req.io) {
+            // Room chính là post_id (chuyển về string vì nó là BigInt)
+            const roomId = deletedComment.post_id.toString();
+            
+            // Gửi sự kiện 'comment_deleted' kèm theo ID của comment bị xóa
+            req.io.to(roomId).emit("comment_deleted", deletedComment.comment_id.toString());
+        }
+
+        return res.status(200).json({ 
+            message: 'Xóa bình luận thành công!', 
+            comment_id: deletedComment.comment_id.toString() 
+        });
+
+    } catch (error) {
+        console.error("Lỗi khi xóa comment:", error);
+        return res.status(500).json({ error: 'Xóa comment thất bại!' });
     }
 }
 
@@ -387,5 +432,6 @@ module.exports = {
     createComment,
     createLike,
     getPostProfile,
-    updatePost
+    updatePost,
+    deleteComment
 }

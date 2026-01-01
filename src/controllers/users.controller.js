@@ -232,15 +232,44 @@ async function getFriends(req, res) {
     try {
         
         const user_id = req.params.id;
+        const search = req.query.search;
+
+        let whereCondition = {
+            status: 'accepted',
+        };
+
+        if (search) {
+            // TRƯỜNG HỢP CÓ TỪ KHÓA TÌM KIẾM
+            // Logic: (Tôi là User 1 VÀ tên User 2 chứa từ khóa) HOẶC (Tôi là User 2 VÀ tên User 1 chứa từ khóa)
+            whereCondition.OR = [
+                {
+                    user_one_id: user_id,
+                    users_friendships_user_two_idTousers: {
+                        display_name: {
+                            contains: search,
+                            mode: 'insensitive' // Tìm kiếm không phân biệt hoa thường
+                        }
+                    }
+                },
+                {
+                    user_two_id: user_id,
+                    users_friendships_user_one_idTousers: {
+                        display_name: {
+                            contains: search,
+                            mode: 'insensitive' // Tìm kiếm không phân biệt hoa thường
+                        }
+                    }
+                }
+            ];
+        } else {
+            whereCondition.OR = [
+                { user_one_id: user_id },
+                { user_two_id: user_id }
+            ];
+        }
 
         const datas = await prisma.friendships.findMany({
-            where: {
-                status: 'accepted',
-                OR: [
-                    { user_one_id: user_id },
-                    { user_two_id: user_id }
-                ]
-            },
+            where: whereCondition,
             select: {
                 user_one_id: true,
                 user_two_id: true,

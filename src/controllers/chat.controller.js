@@ -232,8 +232,66 @@ async function sendMessage(req, res) {
     }
 }
 
+async function deleteMessage(req, res) {
+    try {
+        const currentUserId = BigInt(req.user.user_id);
+        const { id } = req.params; // Lấy messageId từ URL params
+
+        if (!id) {
+            return res.status(400).json({ success: false, message: "Thiếu ID tin nhắn" });
+        }
+
+        const messageIdBigInt = BigInt(id);
+
+        // 1. Tìm tin nhắn để kiểm tra quyền sở hữu và lấy conversation_id
+        const message = await prisma.messages.findUnique({
+            where: { message_id: messageIdBigInt },
+            select: {
+                message_id: true,
+                sender_id: true,
+                conversation_id: true
+            }
+        });
+
+        if (!message) {
+            return res.status(404).json({ success: false, message: "Tin nhắn không tồn tại" });
+        }
+
+        // 2. Kiểm tra quyền (Chỉ người gửi mới được xóa)
+        if (message.sender_id !== currentUserId) {
+            return res.status(403).json({ success: false, message: "Bạn không có quyền xóa tin nhắn này" });
+        }
+
+        // 3. Xóa tin nhắn
+        await prisma.messages.delete({
+            where: { message_id: messageIdBigInt }
+        });
+
+        // 4. --- SOCKET.IO REALTIME ---
+        if (req.io) {
+            const roomId = message.conversation_id.toString();
+            const deletedMessageId = message.message_id.toString();
+
+            // Gửi sự kiện cho tất cả mọi người trong phòng chat (bao gồm cả người xóa)
+            req.io.to(roomId).emit('message_deleted', deletedMessageId);
+        }
+
+        // 5. Trả về thành công
+        return res.status(200).json({ 
+            success: true, 
+            message: "Xóa tin nhắn thành công",
+            message_id: message.message_id.toString()
+        });
+
+    } catch (error) {
+        console.error("Lỗi xóa tin nhắn:", error);
+        return res.status(500).json({ success: false, message: "Lỗi server" });
+    }
+}
+
 module.exports = {
     getOrCreateConversation,
     getMessages,
-    sendMessage
+    sendMessage,
+    deleteMessage
 }

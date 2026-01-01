@@ -5,6 +5,7 @@ const authMidleware = require('../middleware/auth.middleware');
 
 router.post('/create', authMidleware, chatController.getOrCreateConversation);
 router.post('/sendMessage', authMidleware, chatController.sendMessage);
+router.delete('/deleteMessage/:id', authMidleware, chatController.deleteMessage);
 
 router.get('/getMessages/:id', authMidleware, chatController.getMessages);
 
