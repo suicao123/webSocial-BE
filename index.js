@@ -22,10 +22,24 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173", // Thay bằng URL Frontend chính xác của bạn
+        origin: "http://localhost:5173", //URL
         methods: ["GET", "POST"]
     }
 });
+
+// hiện trạng thái online
+let onlineUsers = []; 
+
+const addNewUser = (userId, socketId) => {
+    // Chỉ thêm nếu chưa tồn tại (chuyển về string để so sánh an toàn)
+    if (!onlineUsers.some((user) => user.userId === userId.toString())) {
+        onlineUsers.push({ userId: userId.toString(), socketId });
+    }
+};
+
+const removeUser = (socketId) => {
+    onlineUsers = onlineUsers.filter((user) => user.socketId !== socketId);
+};
 
 // Lắng nghe các sự kiện kết nối Socket
 io.on("connection", (socket) => {
@@ -46,8 +60,21 @@ io.on("connection", (socket) => {
         }
     });
 
+    //add online
+    socket.on("addNewUser", (userId) => {
+        if(userId) {
+            addNewUser(userId, socket.id);
+            // Gửi danh sách mới nhất cho TẤT CẢ client
+            io.emit("getOnlineUsers", onlineUsers);
+            console.log("Online Users:", onlineUsers);
+        }
+    });
+
     socket.on("disconnect", () => {
         console.log("User Disconnected", socket.id);
+        // offline
+        removeUser(socket.id);
+        io.emit("getOnlineUsers", onlineUsers);
     });
 });
 

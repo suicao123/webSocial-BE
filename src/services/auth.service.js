@@ -14,8 +14,8 @@ async function authUser(username, password) {
             return null;
         }
 
-        // const isMatchPass = await bcrypt.compare(password, user.password_hash);
-        const isMatchPass = password == user.password_hash;
+        const isMatchPass = await bcrypt.compare(password, user.password_hash);
+        // const isMatchPass = password == user.password_hash;
 
         if(!isMatchPass) {
             return null;

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { authUser } = require('../services/auth.service');
 const { PrismaClient } = require('../generated/prisma');
 const prisma = new PrismaClient();
+const bcrypt = require('bcrypt');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -63,13 +64,13 @@ async function register(req, res) {
             return res.status(409).json({ message: "Tên đăng nhập hoặc Email đã được sử dụng." });
         }
 
-        // const saltRounds = 10;
-        // const password_hash = await bcrypt.hash(password, saltRounds);
+        const saltRounds = 10;
+        const password_hash = await bcrypt.hash(password, saltRounds);
 
         const newUser = await prisma.users.create({
             data: {
                 username: username,
-                password_hash: password,
+                password_hash: password_hash,
                 email: email,
                 display_name: display_name,
                 avatar_url: avatar_url,
