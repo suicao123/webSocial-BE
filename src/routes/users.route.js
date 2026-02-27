@@ -19,6 +19,8 @@ router.post('/acceptFriendRequest', authMidleware, usersController.acceptFriendR
 router.delete('/unfriend/:user_id', authMidleware, usersController.unfriend);
 router.delete('/deleteUser/:id', authMidleware, usersController.deleteUser);
 router.put('/updateProfile', authMidleware, usersController.updateProfile);
+router.put('/lockUser/:id', authMidleware, usersController.lockUser);
+router.put('/unLockUser/:id', authMidleware, usersController.unLockUser);
 
 router.get('/getFriendshipStatus/:user_id', authMidleware, usersController.getFriendshipStatus);
 

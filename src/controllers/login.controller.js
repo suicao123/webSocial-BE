@@ -15,6 +15,36 @@ async function authLogin(req, res) {
 
     if(user) {
 
+        if (user.status === 'locked') {
+            const now = new Date();
+
+            //Khóa vĩnh viễn
+            if (user.locked_until === null) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Tài khoản của bạn đã bị khóa vĩnh viễn."
+                });
+            }
+
+            //Khóa có thời hạn và vẫn CÒN HẠN
+            if (new Date(user.locked_until) > now) {
+                const unlockDate = new Date(user.locked_until).toLocaleString('vi-VN');
+                return res.status(403).json({
+                    success: false,
+                    message: `Tài khoản của bạn đã bị khóa. Vui lòng thử lại sau: ${unlockDate}`
+                });
+            }
+
+            //Khóa có thời hạn nhưng ĐÃ HẾT HẠN -> Mở khóa tự động
+            await prisma.users.update({
+                where: { user_id: user.user_id },
+                data: {
+                    status: 'active',
+                    locked_until: null
+                }
+            });
+        }
+
         const payload = {
             user_id: user.user_id,
             username: user.username,
@@ -29,14 +59,14 @@ async function authLogin(req, res) {
             { expiresIn: '1h' }
         )
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "Đăng nhập thành công!!!",
             token: token
         });
     }
     else {
-        res.status(401).json({
+        return res.status(401).json({
             success: false,
             message: "Đăng nhập thất bại!!!"
         });
@@ -65,7 +95,8 @@ async function register(req, res) {
         }
 
         const saltRounds = 10;
-        const password_hash = await bcrypt.hash(password, saltRounds);
+        // const password_hash = await bcrypt.hash(password, saltRounds);
+        const password_hash = password;
 
         const newUser = await prisma.users.create({
             data: {

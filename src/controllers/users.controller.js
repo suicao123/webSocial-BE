@@ -111,6 +111,8 @@ async function getUsersList(req, res) {
                 display_name: true,
                 email: true,
                 avatar_url: true,
+                status: true,
+                bio: true,
                 created_at: true,
                 _count: {
                     select: {
@@ -141,6 +143,8 @@ async function getUsersList(req, res) {
                 display_name: user.display_name,
                 email: user.email,
                 avatar_url: user.avatar_url,
+                status: user.status,
+                bio: user.bio,
                 created_at: user.created_at,
                 post_count: user._count.posts_posts_user_idTousers,
                 friend_count: totalFriends
@@ -806,6 +810,115 @@ async function updateProfile(req, res) {
     }
 }
 
+async function lockUser(req, res) {
+    try {
+        const user_id = req.params.id;
+        const { duration } = req.body;
+
+        const existsUser = await prisma.users.findUnique({
+            where: {
+                user_id: user_id
+            }
+        });
+
+        if(!existsUser) {
+            return res.status(404).json({
+                success: false,
+                message: "Người dùng không tồn tại"
+            });
+        }
+
+        let lockedUntil = new Date();
+
+        switch (duration) {
+            case '1_week': 
+                lockedUntil.setDate(lockedUntil.getDate() + 7); 
+                break;
+            case '1_month': 
+                lockedUntil.setMonth(lockedUntil.getMonth() + 1); 
+                break;
+            case '3_months': 
+                lockedUntil.setMonth(lockedUntil.getMonth() + 3); 
+                break;
+            case '6_months': 
+                lockedUntil.setMonth(lockedUntil.getMonth() + 6); 
+                break;
+            case '9_months': 
+                lockedUntil.setMonth(lockedUntil.getMonth() + 9); 
+                break;
+            case '1_year': 
+                lockedUntil.setFullYear(lockedUntil.getFullYear() + 1); 
+                break;
+            case 'permanent': 
+                lockedUntil = null;
+                break;
+            default:
+                return res.status(400).json({ success: false, message: "Thời hạn khóa không hợp lệ!" });
+        }
+
+        await prisma.users.update({
+            where: {
+                user_id: user_id
+            },
+            data: {
+                status: 'locked',
+                locked_until: lockedUntil
+            }
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Khóa tài khoản thành công!!!"
+        });
+    } catch (error) {
+        return res.status(500).json({ 
+            success: false, 
+            message: "Lỗi server khi khóa tài khoản" 
+        });
+    }
+}
+
+async function unLockUser(req, res) {
+    try {
+        
+        const user_id = req.params.id;
+
+        const existsUser = await prisma.users.findUnique({
+            where: {
+                user_id: user_id
+            }
+        });
+
+        if(!existsUser) {
+            return res.status(404).json({
+                success: false,
+                message: "Không tìm thấy người dùng"
+            });
+        }
+
+        await prisma.users.update({
+            where: {
+                user_id: user_id
+            },
+            data: {
+                status: 'active',
+                locked_until: null
+            }
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Mở khóa tài khoản thành công"
+        });
+
+    } catch (error) {
+        return res.status(500).json({ 
+            success: false, 
+            message: "Lỗi server khi mở khóa tài khoản" 
+        });
+    }
+}
+
 module.exports = {
     getUser,
     getFriends,
@@ -822,5 +935,7 @@ module.exports = {
     deleteUser,
     getAdminsList,
     // getUsersListByName
-    getDashboardStats
+    getDashboardStats,
+    lockUser,
+    unLockUser
 }

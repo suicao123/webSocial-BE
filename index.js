@@ -13,6 +13,7 @@ require('dotenv').config();
 const routes = require('./src/routes');
 const { Server } = require('socket.io');
 const socketMiddleware = require('./src/middleware/socket.middleware');
+const { log } = require('console');
 
 app.use(cors());
 app.use(express.json());
