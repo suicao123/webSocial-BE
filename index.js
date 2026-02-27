@@ -18,12 +18,14 @@ const { log } = require('console');
 app.use(cors());
 app.use(express.json());
 
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+
 // 3. Tạo HTTP Server từ Express app
 const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173", //URL
+        origin: CLIENT_URL, //URL
         methods: ["GET", "POST"]
     }
 });
