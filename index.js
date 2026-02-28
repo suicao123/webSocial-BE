@@ -6,7 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const app = express();
-const port = 8080;
+const port = process.env.PORT || 8080;
 require('dotenv').config();
 
 //import routes
@@ -15,19 +15,24 @@ const { Server } = require('socket.io');
 const socketMiddleware = require('./src/middleware/socket.middleware');
 const { log } = require('console');
 
-app.use(cors());
-app.use(express.json());
-
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+
+app.use(cors({
+    origin: CLIENT_URL,
+    credentials: true
+}));
+app.use(express.json());
 
 // 3. Tạo HTTP Server từ Express app
 const server = http.createServer(app);
 
 const io = new Server(server, {
     cors: {
-        origin: CLIENT_URL, //URL
-        methods: ["GET", "POST"]
-    }
+        origin: CLIENT_URL,
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    transports: ['websocket', 'polling']
 });
 
 // hiện trạng thái online
