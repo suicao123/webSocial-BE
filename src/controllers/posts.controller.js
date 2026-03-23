@@ -235,10 +235,11 @@ async function getComment(req, res) {
             select: {
                 comment_id: true, 
                 user_id: true,
-                
                 post_id: true,
                 content: true,
                 created_at: true,
+                parent_comment_id: true,
+                reply_to_user_id: true,
 
                 users: {
                     select: {
@@ -249,7 +250,35 @@ async function getComment(req, res) {
             }
         });
 
-        return res.status(200).json(comments);
+        // 2. XỬ LÝ SẮP XẾP LẠI MẢNG: Cha -> Các Con -> Cha -> Các Con
+        // Tách ra bình luận gốc và câu trả lời
+        const parents = comments.filter(c => c.parent_comment_id === null);
+        const children = comments.filter(c => c.parent_comment_id !== null);
+
+        // Đảo ngược mảng con để các câu trả lời cũ nhất hiển thị sát ngay dưới bình luận cha (đọc từ trên xuống)
+        children.reverse();
+
+        let sortedComments = [];
+        
+        // Duyệt qua từng bình luận cha và nhét các bình luận con tương ứng vào ngay dưới
+        parents.forEach(parent => {
+            sortedComments.push(parent); // Nhét cha vào
+            
+            // Tìm tất cả các con thuộc về cha này
+            const replies = children.filter(c => 
+                c.parent_comment_id.toString() === parent.comment_id.toString()
+            );
+            
+            sortedComments.push(...replies); // Nhét các con vào
+        });
+
+        // 3. BẢO VỆ LỖI BIGINT: Chuyển đổi toàn bộ BigInt thành chuỗi (String) trước khi trả về JSON
+        const serializedComments = JSON.parse(JSON.stringify(sortedComments, (key, value) =>
+            typeof value === 'bigint' ? value.toString() : value
+        ));
+
+        // Trả mảng đã sắp xếp đẹp đẽ về cho React
+        return res.status(200).json(serializedComments);
     }
     catch (error) {
         console.error("Lỗi khi lấy comment:", error);
@@ -261,28 +290,48 @@ async function createComment(req, res) {
     try {
         const data = req.body;
 
-        const dataComment = await prisma.comments.create({
-            data: {
-                content: data.content,
-
-                posts: {
-                    connect: {
-                        post_id: BigInt(data.post_id)
-                    }
-                },
-
-                users: {
-                    connect: {
-                        user_id: BigInt(data.user_id)
-                    }
+        const commentData = {
+            content: data.content,
+            posts: {
+                connect: {
+                    post_id: BigInt(data.post_id)
                 }
             },
+            users: {
+                connect: {
+                    user_id: BigInt(data.user_id)
+                }
+            }
+        };
+
+        //Nếu là bình luận trả lời (có parent_comment_id), thêm lệnh connect
+        if (data.parent_comment_id) {
+            commentData.comments = {
+                connect: {
+                    comment_id: BigInt(data.parent_comment_id)
+                }
+            };
+        }
+
+        //Nếu có chỉ định người được trả lời, thêm lệnh connect bằng đúng tên Prisma tự sinh
+        if (data.reply_to_user_id) {
+            commentData.users_comments_reply_to_user_idTousers = {
+                connect: {
+                    user_id: BigInt(data.reply_to_user_id)
+                }
+            };
+        }
+
+        const dataComment = await prisma.comments.create({
+            data: commentData,
             select: {
                 comment_id: true, 
                 user_id: true, 
                 post_id: true,
                 content: true,
                 created_at: true,
+                parent_comment_id: true,
+                reply_to_user_id: true,
                 users: {
                     select: {
                         display_name: true,
